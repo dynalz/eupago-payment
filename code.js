@@ -77,7 +77,7 @@ window.addEventListener("load", (event) => {
         callable()
     }
 
-    document.getElementById("step1").addEventListener("click", function (event) { event.preventDefault(); letsgo(generate) });
+    document.getElementById("step1").addEventListener("click", function (event) { event.preventDefault(); event.stopPropagation(); letsgo(generate) });
     document.getElementById("price-tag").innerHTML = `${final_price}€`;
     document.getElementById("product-name").innerHTML = product_name;
 
