@@ -2,8 +2,10 @@ window.addEventListener("load", (event) => {
     const KEY = window.eupago.channel
     const next_page = window.eupago.next_page
     const product_name = window.eupago.product_name
+    
     var final_price = window.eupago.discount ? window.eupago.price * (100-window.eupago.discount) / 100 : window.eupago.price
     final_price = parseFloat(final_price.toFixed(2))
+    
     var campos_extra = []
     if (window.eupago.campos_extra) {
         for (key in window.eupago.campos_extra) {
@@ -18,32 +20,25 @@ window.addEventListener("load", (event) => {
         var email = document.getElementById("email").value
         var telefone = document.getElementById("telefone").value
     
-        //email = "test@testflow.com"
-        //telefone = "938527188"
-    
-    
-        telefone = telefone.replace("+351", "")
+        telefone = telefone.replace("+", "")
         telefone = telefone.replace("351", "")
         while (telefone.indexOf(" ") != -1)
             telefone = telefone.replace(" ", "")
         if (!validateEmail(email))
             return fail_error("Email incorrecto, por favor corrija!")
-        if (telefone.length != 9)
-            return fail_error("Numero de telemovel errado!")
+        if (telefone.length != 9 || telefone[0] != "9" || !isNumeric(telefone))
+            return fail_error("Número de telemóvel errado!")
         if (forma_pagamento == "mbway") {
             const data = await eupago_api.mbway({valor: final_price, email:email, contacto: telefone, alias: telefone})
             if (data.estado == 0)
-                wait_for_payment(data)
-            else
-                return fail_error("Erro a gerar mbway, colocou o numero de telemovel certo?")
+                return wait_for_payment(data)
+            return fail_error("Erro a gerar mbway, colocou o numero de telemovel certo?")
         } else {
             const data = await eupago_api.multibanco({valor: final_price, email:email, contacto: telefone})
             if (data.estado == 0)
-                wait_for_payment(data)
-            else
-                return fail_error("Erro a gerar referencia de multibanco")
+                return wait_for_payment(data)
+            return fail_error("Erro a gerar referencia de multibanco")
         }
-        return
     }
 
     async function wait_for_payment(data) {
@@ -75,16 +70,14 @@ window.addEventListener("load", (event) => {
 
     }
     
-    function wrapper(callable) {
-        return function letsgo() {
-            if (eupago_api.making_request) {
-                return
-            }
-            callable()
+    function letsgo(callable) {
+        if (eupago_api.making_request) {
+            return
         }
+        callable()
     }
 
-    document.getElementById("step1").addEventListener("click", wrapper(generate));
+    document.getElementById("step1").addEventListener("click", function (event) { event.preventDefault(); letsgo(generate) });
     document.getElementById("price-tag").innerHTML = `${final_price}€`;
     document.getElementById("product-name").innerHTML = product_name;
 
@@ -151,4 +144,9 @@ function validateEmail(email) {
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isNumeric(num) {
+    let isdigits_only = /^\d+$/.test(num);
+    return isdigits_only
 }
