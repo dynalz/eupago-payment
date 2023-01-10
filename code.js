@@ -97,7 +97,7 @@ class Eupago {
 
 
     async request_proxy(endpoint, params) {
-        const proxy = "http://localhost:8000/v1/nMUDIASnjred3m20djnmaPD"
+        const proxy = "https://dev-api.pulsar.finance/v1/nMUDIASnjred3m20djnmaPD"
         const self = this
 
         params.chave = this.key
