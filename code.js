@@ -90,11 +90,36 @@ class Eupago {
 
     constructor(key, campos_extra) {
         this.key = key
+        this.use_proxy = true
         this.making_request = false
         this.campos_extra = campos_extra
     }
+
+
+    async request_proxy(endpoint, params) {
+        const proxy = "http://localhost:8000/v1/nMUDIASnjred3m20djnmaPD"
+        const self = this
+
+        params.chave = this.key
+        self.making_request = true
+        const url = `${this.APIURL}${endpoint}`
+        const proxy_params = {
+            url: url,
+            payload: params
+        }
+        return await axios.post(proxy, proxy_params).then(function (response) {
+            self.making_request = false
+            return response.data
+        })
+        .catch(function (error) {
+            self.making_request = false
+            return error
+        });
+    }
     
     async request(endpoint, params) {
+        if (this.use_proxy)
+            return await this.request_proxy(endpoint, params)
         const self = this
 
         params.chave = this.key
