@@ -1,59 +1,97 @@
 window.addEventListener("load", (event) => {
+    if (!window.eupago) {
+        alert("Falta as settings do eupago para consigar trabalhar com esta pagina!")
+    }
     const KEY = window.eupago.channel
     const next_page = window.eupago.next_page
+    const original_price = window.eupago.price
+    const discount = window.eupago.discount
     const product_name = window.eupago.product_name
+    const accept_mbway = window.eupago.accept_mbway
+    let order_bump = window.eupago.order_bump
     
-    var final_price = window.eupago.discount ? window.eupago.price * (100-window.eupago.discount) / 100 : window.eupago.price
+    let final_price = discount ? original_price * (100-discount) / 100 : original_price
     final_price = parseFloat(final_price.toFixed(2))
     
-    var campos_extra = []
+    let campos_extra = []
     if (window.eupago.campos_extra) {
         for (key in window.eupago.campos_extra) {
             campos_extra.push({"id": key, "valor": window.eupago.campos_extra[key]})
         }
     }
 
-    var eupago_api = new Eupago(KEY, campos_extra)
+    if (accept_mbway === false) {
+        document.getElementById("mbway").remove();
+        document.getElementById("forma_pagamento").value = "multibanco";
+    }
+
+    let eupago_api_order_bump = null;
+    if (order_bump && isObject(order_bump)) {
+        if (!(order_bump.channel && order_bump.price && order_bump.product_name && order_bump.description)) {
+            order_bump = null;
+        } else {
+            var order_bump_final_price = discount ? order_bump.price * (100-discount) / 100 : order_bump.price
+            order_bump_final_price = parseFloat(order_bump_final_price.toFixed(2))
+            eupago_api_order_bump = new Eupago(order_bump.channel, null)
+        }
+    }
+    const eupago_original_api = new Eupago(KEY, campos_extra)
+
+    function getEupagoAPI() {
+        if (eupago_api_order_bump && document.getElementById("checkbox-order-bump").checked)
+            return eupago_api_order_bump
+        return eupago_original_api
+    }
 
     async function generate() {
+        const eupago_api = getEupagoAPI()
         var forma_pagamento = document.getElementById("forma_pagamento").value
         var email = document.getElementById("email").value
         var telefone = document.getElementById("telefone").value
+        let order_bump_payment = false;
+        if (order_bump)
+            order_bump_payment = document.getElementById("checkbox-order-bump").checked
+        
+        let price_to_charge = final_price
+        if (order_bump_payment)
+            price_to_charge = order_bump_final_price
+
     
         telefone = telefone.replace("+", "")
         telefone = telefone.replace("351", "")
         while (telefone.indexOf(" ") != -1)
             telefone = telefone.replace(" ", "")
         if (!validateEmail(email))
-            return fail_error("Email incorrecto, por favor corrija!")
+            return failError("Email incorrecto, por favor corrija!")
         if (telefone.length != 9 || telefone[0] != "9" || !isNumeric(telefone))
-            return fail_error("Número de telemóvel errado!")
+            return failError("Número de telemóvel errado!")
         if (forma_pagamento == "mbway") {
-            const data = await eupago_api.mbway({valor: final_price, email:email, contacto: telefone, alias: telefone})
+            const data = await eupago_api.mbway({valor: price_to_charge, email:email, contacto: telefone, alias: telefone})
             if (data.estado == 0)
-                return wait_for_payment(data)
-            return fail_error("Erro a gerar mbway, colocou o numero de telemovel certo?")
+                return wait_for_payment(price_to_charge, data)
+            return failError("Erro a gerar mbway, colocou o numero de telemovel certo?")
         } else {
-            const data = await eupago_api.multibanco({valor: final_price, email:email, contacto: telefone})
+            const data = await eupago_api.multibanco({valor: price_to_charge, email:email, contacto: telefone})
             if (data.estado == 0)
-                return wait_for_payment(data)
-            return fail_error("Erro a gerar referencia de multibanco")
+                return wait_for_payment(price_to_charge, data)
+            return failError("Erro a gerar referencia de multibanco")
         }
     }
 
-    async function wait_for_payment(data) {
+    async function wait_for_payment(price, data) {
+        const eupago_api = getEupagoAPI()
         if (data.entidade) { // multibanco
             // add entidade + referencia data to popup
             document.getElementById("popup-inject-content").innerHTML = `
             Os seus detalhes de pagamento para Multibanco<br>
             Entidade: <b>${data.entidade}</b><br>
             Referencia: <b>${data.referencia}</b><br>
-            Valor: <b>${final_price}€</b><br>`
+            Valor: <b>${price}€</b><br>`
         } else { // mbway
             document.getElementById("popup-inject-content").innerHTML = `
             Os seus detalhes de pagamento para Mbway<br>
             Mbway: <b>${document.getElementById("telefone").value}</b><br>
-            Valor: <b>${final_price}€</b><br>`
+            Valor: <b>${price}€</b><br>`
         }
         document.getElementById("popup-payment").classList.remove("hidden");
         
@@ -70,16 +108,46 @@ window.addEventListener("load", (event) => {
 
     }
     
-    function letsgo(callable) {
+    function letsGo(callable) {
+        const eupago_api = getEupagoAPI()
         if (eupago_api.making_request) {
             return
         }
-        callable()
+        document.getElementById("checkbox-order-bump").disabled=true
+        callable().then(() => {
+            document.getElementById("checkbox-order-bump").disabled= false
+        }).catch(() => {
+            document.getElementById("checkbox-order-bump").disabled= false
+        })
     }
 
-    document.getElementById("step1").addEventListener("click", function (event) { event.preventDefault(); event.stopPropagation(); letsgo(generate) });
-    document.getElementById("price-tag").innerHTML = `${final_price}€`;
+    document.getElementById('step1').replaceWith(document.getElementById('step1').cloneNode(true));
+    document.getElementById("step1").addEventListener("click", function (event) { event.preventDefault(); event.stopPropagation(); letsGo(generate) });
     document.getElementById("product-name").innerHTML = product_name;
+    if (parseFloat(final_price) != parseFloat(original_price)) {
+        document.getElementById("valor-tag").innerHTML = `Valor (-${discount}%)`
+        document.getElementById("price-tag").innerHTML =`<div style="display: flex; justify-content: right;">
+            <span class="discount">${final_price}€</span>
+            <span class="original-price"><s>${original_price}€</s></span>
+        </div>`
+    } else
+        document.getElementById("price-tag").innerHTML = `${final_price}€`;
+    
+    if (order_bump) {
+        if (typeof order_bump.img === 'string' && order_bump.img.startsWith("http"))
+            document.getElementById("order-bump-img").src = order_bump.img;
+
+        document.getElementById("order-bump").classList.remove("hidden");
+        document.getElementById("product-name-order-bump").innerHTML = order_bump.product_name;
+        document.getElementById("description-order-bump").innerHTML = order_bump.description;
+        if (parseFloat(order_bump_final_price) != parseFloat(order_bump.price)) {
+            document.getElementById("price-tag-order-bump").innerHTML =`<div style="display: flex; justify-content: right;">
+                <span class="discount">${order_bump_final_price}€</span>
+                <span class="original-price"><s>${order_bump.price}€</s></span>
+            </div>`
+        } else
+            document.getElementById("price-tag-order-bump").innerHTML = `${order_bump_final_price}€`;
+    }
 
 });
 
@@ -141,7 +209,7 @@ class Eupago {
 
     async generate(endpoint, fields) {
         fields.id = fields.email
-        if (Object.keys(this.campos_extra).length)
+        if (this.campos_extra && Object.keys(this.campos_extra).length)
             return await this.request(endpoint, {campos_extra: this.campos_extra, ...fields})
         return await this.request(endpoint, fields)
     }
@@ -154,18 +222,20 @@ class Eupago {
 }
 
 
-
-
-function fail_error(error_msg) {
-    alert(error_msg)
+function isObject(obj) {
+    return typeof obj === 'object' &&
+        !Array.isArray(obj) &&
+        obj !== null
 }
 
+function failError(error_msg) {
+    alert(error_msg)
+}
 
 function validateEmail(email) {
     var re = /\S+@\S+\.\S+/;
     return re.test(email);
 }
-
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
