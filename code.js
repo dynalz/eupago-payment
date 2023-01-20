@@ -146,7 +146,7 @@ window.addEventListener("load", (event) => {
                 <span class="original-price"><s>${order_bump.price}€</s></span>
             </div>`
         } else
-            document.getElementById("price-tag-order-bump").innerHTML = `${order_bump_final_price}€`;
+            document.getElementById("price-tag-order-bump").innerHTML = `${order_bump_final_price-final_price}€`;
     }
 
 });
