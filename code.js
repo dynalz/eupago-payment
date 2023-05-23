@@ -1,7 +1,13 @@
+var optional_fields = ["nif", "empresa"]
+var required_fields = ["nome", "morada", "zip", "cidade", "pais"]
+
+
 window.addEventListener("load", (event) => {
     if (!window.eupago) {
         alert("Falta as settings do eupago para consigar trabalhar com esta pagina!")
     }
+    for (key in window.eupago.campos_to_id)
+        window.eupago.campos_to_id[key.toLowerCase()] = window.eupago.campos_to_id[key]
     const KEY = window.eupago.channel
     const next_page = window.eupago.next_page
     const original_price = window.eupago.price
@@ -44,11 +50,15 @@ window.addEventListener("load", (event) => {
     }
 
     async function generate() {
+        // sourcery skip: use-braces
+        // sourcery skip: avoid-using-var
         const eupago_api = getEupagoAPI()
-        var forma_pagamento = document.getElementById("forma_pagamento").value
         var email = document.getElementById("email").value
         var telefone = document.getElementById("telefone").value
+        var forma_pagamento = document.getElementById("forma_pagamento").value
+        var forma_pagamento = document.getElementById("forma_pagamento").value
         let order_bump_payment = false;
+
         if (order_bump)
             order_bump_payment = document.getElementById("checkbox-order-bump").checked
         
@@ -57,6 +67,11 @@ window.addEventListener("load", (event) => {
             price_to_charge = order_bump_final_price
 
     
+        for (field of required_fields) {
+            let field_value = document.getElementById(field).value
+            if (field_value == "")
+                return failError(`Valor no campo ${field} incorrecto, por favor corrija!`)
+        }
         telefone = telefone.replace("+", "")
         telefone = telefone.replace("351", "")
         while (telefone.indexOf(" ") != -1)
@@ -124,15 +139,18 @@ window.addEventListener("load", (event) => {
     document.getElementById('step1').replaceWith(document.getElementById('step1').cloneNode(true));
     document.getElementById("step1").addEventListener("click", function (event) { event.preventDefault(); event.stopPropagation(); letsGo(generate) });
     document.getElementById("product-name").innerHTML = product_name;
-    if (parseFloat(final_price) != parseFloat(original_price)) {
+
+    // setup price
+    if (parseFloat(final_price) != parseFloat(original_price)) { // has discount
         document.getElementById("valor-tag").innerHTML = `Valor (-${discount}%)`
         document.getElementById("price-tag").innerHTML =`<div style="display: flex; justify-content: right;">
             <span class="discount">${final_price}€</span>
             <span class="original-price"><s>${original_price}€</s></span>
         </div>`
-    } else
+    } else // no discount
         document.getElementById("price-tag").innerHTML = `${final_price}€`;
     
+    // order bump
     if (order_bump) {
         if (typeof order_bump.img === 'string' && order_bump.img.startsWith("http"))
             document.getElementById("order-bump-img").src = order_bump.img;
@@ -209,9 +227,27 @@ class Eupago {
 
     async generate(endpoint, fields) {
         fields.id = fields.email
-        if (this.campos_extra && Object.keys(this.campos_extra).length)
-            return await this.request(endpoint, {campos_extra: this.campos_extra, ...fields})
-        return await this.request(endpoint, fields)
+        var campos_extra = [...this.campos_extra, {"id": window.eupago.campos_to_id["telemovel"], "valor": fields.contacto}]
+        // add all required fields to campos_extra
+        for (field of required_fields) {
+            let field_value = document.getElementById(field).value
+            let field_id = window.eupago.campos_to_id[field]
+            campos_extra.push({"id": field_id, "valor": field_value})
+        }
+        // add all optional fields to campos_extra
+        for (field of optional_fields) {
+            let field_value = document.getElementById(field).value
+            if (field_value == "")
+                continue
+            let field_id = window.eupago.campos_to_id[field]
+            campos_extra.push({"id": field_id, "valor": field_value})
+        }
+        // get comercial from url
+        const urlParams = new URLSearchParams(window.location.search);
+        const comercial = urlParams.get('comercial');
+        if (comercial)
+            campos_extra.push({"id": window.eupago.campos_to_id["comercial"], "valor": comercial})
+        return await this.request(endpoint, {campos_extra: campos_extra, ...fields})
     }
     async multibanco(fields) {
         return await this.generate("multibanco/create", {per_dup: 0, ...fields})
