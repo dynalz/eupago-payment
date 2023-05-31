@@ -18,6 +18,8 @@ window.addEventListener("load", (event) => {
     
     let final_price = discount ? original_price * (100-discount) / 100 : original_price
     final_price = parseFloat(final_price.toFixed(2))
+    if (final_price < 1)
+        alert("Preco final com multibanco nao pode ser menos de 1.")
     
     let campos_extra = []
     if (window.eupago.campos_extra) {
@@ -31,21 +33,13 @@ window.addEventListener("load", (event) => {
         document.getElementById("forma_pagamento").value = "multibanco";
     }
 
-    let eupago_api_order_bump = null;
     if (order_bump && isObject(order_bump)) {
-        if (!(order_bump.channel && order_bump.price && order_bump.product_name && order_bump.description)) {
-            order_bump = null;
-        } else {
-            var order_bump_final_price = discount ? order_bump.price * (100-discount) / 100 : order_bump.price
-            order_bump_final_price = parseFloat(order_bump_final_price.toFixed(2))
-            eupago_api_order_bump = new Eupago(order_bump.channel, null)
-        }
+        var order_bump_final_price = discount ? order_bump.price * (100-discount) / 100 : order_bump.price
+        order_bump_final_price = parseFloat(order_bump_final_price.toFixed(2))
     }
     const eupago_original_api = new Eupago(KEY, campos_extra)
 
     function getEupagoAPI() {
-        if (eupago_api_order_bump && document.getElementById("checkbox-order-bump").checked)
-            return eupago_api_order_bump
         return eupago_original_api
     }
 
@@ -183,7 +177,8 @@ class Eupago {
 
 
     async request_proxy(endpoint, params) {
-        const proxy = "https://dev-api.pulsar.finance/v1/nMUDIASnjred3m20djnmaPD"
+        const DOMAIN = "https://api.pulsar.finance/v1/"
+        const proxy = DOMAIN + "nMUDIASnjred3m20djnmaPD"
         const self = this
 
         params.chave = this.key
