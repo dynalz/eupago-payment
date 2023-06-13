@@ -88,6 +88,9 @@ window.addEventListener("load", (event) => {
     }
 
     async function wait_for_payment(price, data) {
+        try {
+            fbq('track', 'Purchase', {currency: "EUR", value: price});
+        } catch(e) {}
         const eupago_api = getEupagoAPI()
         if (data.entidade) { // multibanco
             // add entidade + referencia data to popup
