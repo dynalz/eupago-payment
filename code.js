@@ -58,7 +58,7 @@ window.addEventListener("load", (event) => {
         
         let price_to_charge = final_price
         if (order_bump_payment)
-            price_to_charge = order_bump_final_price
+            price_to_charge += order_bump_final_price
 
     
         for (field of required_fields) {
